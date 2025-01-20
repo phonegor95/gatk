@@ -57,8 +57,7 @@ def main():
     trainer = pl.Trainer(gradient_clip_val=1.0, accelerator=args.accelerator)
 
     test_dataset = ReferenceDataset(tensor_reader)
-    test_loader = DataLoader(test_dataset, batch_size=args.batch_size)
-
+    test_loader = DataLoader(test_dataset, batch_size=args.batch_size, num_workers=10)
     trainer.test(model, test_loader)
     create_output_vcf(args.vcf_file, args.tmp_file, args.output_file, label)
 

@@ -544,7 +544,7 @@ class ReadTensorEncoder(Encoder):
             variant.contig,
             start,
             stop,
-            multiple_iterators=False,
+            multiple_iterators=True,
         ):
             if self.filter_read(read, interval):
                 continue

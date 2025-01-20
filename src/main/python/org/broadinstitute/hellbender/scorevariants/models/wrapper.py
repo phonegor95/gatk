@@ -22,26 +22,30 @@ class LightningWrapper(pl.LightningModule):
         # in addition to provenance, this helps
         # with model checkpointing by saving the model
         self.save_hyperparameters()
-
+        self.test_results = []
         if tmp_file:
-            self.tmp_file = open(tmp_file, 'w')
+            self.tmp_file = tmp_file 
 
     def forward(self, batch):
         outputs = self.model(batch)
         return outputs
 
     def on_test_end(self):
-        self.tmp_file.close()
+        with open(self.tmp_file, "w") as f:
+            for result in self.test_results:
+                f.write('%s\t%d\t%s\t[%s]\t%.3f\n' % (
+                    result['chrom'], result['pos'], result['ref'], result['alt'], result['score']))
         
     def test_step(self, batch, batch_idx):
         predictions = self(batch)
         detached_predictions = predictions.detach()
         prob_predictions = F.softmax(detached_predictions)
         scores = predictions_to_score(prob_predictions.detach(), batch['type'])
-        if self.tmp_file:
-            for i in range(len(scores)):
-                self.tmp_file.write('%s\t%d\t%s\t[%s]\t%.3f\n' % (batch['chrom'][i],
-                                                                      batch['pos'][i],
-                                                                      batch['ref'][i],
-                                                                      batch['alt'][i],
-                                                                      scores[i]))
+        for i in range(len(scores)):
+            self.test_results.append({
+                'chrom': batch['chrom'][i],
+                'pos': batch['pos'][i],
+                'ref': batch['ref'][i],
+                'alt': batch['alt'][i],
+                'score': scores[i]
+            })
