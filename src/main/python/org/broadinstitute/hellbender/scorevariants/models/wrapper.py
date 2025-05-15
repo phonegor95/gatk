@@ -43,7 +43,7 @@ class LightningWrapper(pl.LightningModule):
     def on_test_end(self):
         if dist.is_initialized():
             dist.barrier()
-        self.tmp_file.close()
+        self._tmp_fh.close()
         
     def test_step(self, batch, batch_idx):
         predictions = self(batch)
