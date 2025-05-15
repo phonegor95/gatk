@@ -10,3 +10,8 @@ However, note that it is easier to do development by installing live/editable ve
 the underlying environment. To do this, 1) remove the pip install of the `gatkpythonpackages.zip` archive in the 
 conda environment file, 2) create and activate the corresponding conda environment, then 
 3) run the editable pip install.
+
+Additional
+pip install cyvcf2
+pip install pytorch-lightning==2.4.0
+pip install torch==2.4.0 torchvision==0.19.0 torchaudio==2.4.0 --index-url https://download.pytorch.org/whl/cu124

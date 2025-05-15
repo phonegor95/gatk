@@ -5,11 +5,18 @@ import torch
 import sys
 import pytorch_lightning as pl
 from lightning_fabric.utilities import seed
-from torch.utils.data import DataLoader
+from torch.utils.data import DataLoader, DistributedSampler
 from scorevariants.dataset import ReferenceDataset
 from scorevariants.readers import TensorReader, ReferenceTensorReader
 from scorevariants.models.wrapper import LightningWrapper
 from scorevariants.create_output_vcf import create_output_vcf
+import torch.distributed as dist
+import warnings
+warnings.filterwarnings("ignore")
+
+def init_distributed_mode():
+    dist.init_process_group(backend='nccl')  # 'nccl' is recommended for multi-GPU setups
+    torch.cuda.set_device(dist.get_rank())  # Set the GPU device for each rank
 
 def get_model(args, model_file):
     """
@@ -40,9 +47,10 @@ def get_args():
 
 def main():
     args = get_args()
+    init_distributed_mode()
     torch.manual_seed(args.seed)
     seed.seed_everything(args.seed)
-
+    torch.set_float32_matmul_precision('high')
     if args.tensor_type == 'reference':
         model_file = args.model_directory + '/1d_cnn_mix_train_full_bn.pt'
         tensor_reader = ReferenceTensorReader.from_files(args.vcf_file, args.ref_file)
@@ -54,12 +62,14 @@ def main():
     else:
         sys.exit('Unknown tensor type!')
     model = get_model(args, model_file)
-    trainer = pl.Trainer(gradient_clip_val=1.0, accelerator=args.accelerator)
-
     test_dataset = ReferenceDataset(tensor_reader)
-    test_loader = DataLoader(test_dataset, batch_size=args.batch_size, num_workers=10, prefetch_factor=10)
+    
+    sampler = DistributedSampler(test_dataset, shuffle=False)  # Disable shuffling to preserve order
+    test_loader = DataLoader(test_dataset, batch_size=args.batch_size, num_workers=11, sampler=sampler)
+    n_gpus = torch.cuda.device_count()
+    trainer = pl.Trainer(gradient_clip_val=1.0, accelerator=args.accelerator, strategy="ddp", devices=n_gpus, num_nodes=1)
     trainer.test(model, test_loader)
-    create_output_vcf(args.vcf_file, args.tmp_file, args.output_file, label)
+    create_output_vcf(args.vcf_file, args.tmp_file, args.output_file, label, n_gpus)
 
 if __name__ == '__main__':
     main()
